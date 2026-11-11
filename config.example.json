@@ -1,0 +1,12 @@
+{
+  "API_ID": 123456,
+  "API_HASH": "0123456789abcdef0123456789abcdef",
+  "PHONE": "+15551234567",
+  "BOT_USERNAME": "my_xp_bot",
+  "SESSION_NAME": "xp_claimer_session",
+  "SESSION_STRING": null,
+  "BUTTON_TEXT": "Claim XP",
+  "BUTTON_INDEX": null,
+  "MESSAGE_LIMIT": 100,
+  "DRY_RUN": false
+}

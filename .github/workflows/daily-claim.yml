@@ -1,0 +1,33 @@
+name: Daily XP Claim
+
+on:
+  schedule:
+    # Runs every day at 09:00 UTC. Change the cron to your preferred time.
+    - cron: "0 9 * * *"
+  workflow_dispatch:   # lets you run it manually from the Actions tab
+
+permissions: {}
+
+jobs:
+  claim:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Claim XP (Method B — mini app HTTP replay)
+        env:
+          TG_INIT_DATA: ${{ secrets.TG_INIT_DATA }}
+          TG_CLAIM_URL: ${{ secrets.TG_CLAIM_URL }}
+          TG_CLAIM_BODY: ${{ secrets.TG_CLAIM_BODY }}
+          TG_DRY_RUN: "0"
+        run: pwsh -NoProfile -File reverse-engineer.ps1
+
+      - name: Upload logs (always, even on failure)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xp-claim-logs
+          path: |
+            claim-xp.log
+          retention-days: 5

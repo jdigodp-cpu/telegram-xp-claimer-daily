@@ -1,0 +1,18 @@
+# Telegram session files (created by Telethon; do NOT commit real sessions)
+*.session
+*.session-journal
+
+# Config with real credentials
+config.json
+.env
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+session.b64
