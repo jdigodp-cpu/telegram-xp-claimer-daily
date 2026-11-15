@@ -1,86 +1,96 @@
 # Telegram XP Claimer
 
-Automates the daily "Claim XP" / "Daily reward" button in your Telegram group's
-mini app and can run on GitHub Actions every day.
+Fully automated daily "Claim XP" for your Telegram mini app, running on GitHub
+Actions with **no manual steps** — no initData capture, no SMS codes in CI, no
+bot ownership needed.
+
+## How it works
+
+Uses Telegram's `messages.requestWebView` API via Telethon. When you request a
+Web App view, Telegram's servers generate a **freshly signed initData** URL
+(`#tgWebAppData=...`) and return it to your client. The script extracts this
+initData and POSTs it to the mini app's `/api/daily` endpoint to claim XP.
+
+Since Telegram generates the initData server-side every time, it's always valid
+— no expiration, no manual capture needed.
 
 ## Your setup (PZP Sentry)
 
-Your "Claim" button for "Daily reward: +5 XP" lives **inside the mini app/Web
-App** (`app.piratezparty.com`), not as a regular inline button in the Telegram
-chat. That means Method A (Telethon button-clicking) cannot reach it — **Method B
-(HTTP replay) is the working approach** for your case.
+Verified working against `app.piratezparty.com/api/daily`:
+- `{"claimed":true,"balance":210,...}` — XP claimed successfully ✅
 
-## Method B — replay the mini app's HTTP request (WORKING ✅)
+## Prerequisites
 
-When you click "Claim" in the mini app, it sends:
+* Telegram API ID and API Hash from https://my.telegram.org/apps
+* Your phone number (international format, e.g. +919370208002)
 
-```
-POST https://app.piratezparty.com/api/daily
-Body: {}
-Header: x-telegram-init-data = <captured from DevTools>
-```
-
-### 1. Capture initData (do this once, refresh when it expires)
-
-1. Open Telegram → launch the PZP Sentry mini app
-2. Press **F12** → **Network tab**
-3. Click the **"Claim"** button
-4. Find the `POST /api/daily` request → copy the `x-telegram-init-data` header value
-5. The initData looks like:
-   `query_id=...&user=...&auth_date=...&hash=...`
-
-### 2. Run locally to test
+## 1. First-time login (on your PC, one-time only)
 
 ```powershell
 cd C:\Users\raaaaaaj\VSCode\telegram-xp-claimer
-./reverse-engineer.ps1 -DryRun
-# Then for real:
-./reverse-engineer.ps1 -InitData "PASTE_YOUR_INIT_DATA_HERE"
+
+# Copy config template
+copy config.example.json config.json
+# Edit config.json with your API_ID, API_HASH, PHONE, BOT_USERNAME
+
+# Run interactively — enter the SMS code Telegram sends you
+& "C:\Users\raaaaaaj\AppData\Local\Programs\Python\Python311\python.exe" claim-xp-requestwebview.py --interactive
 ```
 
-### 3. GitHub Actions (daily, automatic)
+When login succeeds, the script prints `AUTH_SESSION_STRING=...` — **copy this
+value**. You'll use it as a GitHub secret so you never log in again.
+
+## 2. Re-run locally (no login needed)
+
+```powershell
+& "C:\Users\raaaaaaj\AppData\Local\Programs\Python\Python311\python.exe" claim-xp-requestwebview.py config.json
+```
+
+Add `-DryRun` to test without actually claiming.
+
+## 3. GitHub Actions (fully automated, daily)
 
 The workflow in `.github/workflows/daily-claim.yml` runs every day at 09:00 UTC
 (and can be triggered manually from the Actions tab).
 
-#### Secrets to add in your repo
+### Secrets to add
 (Settings → Secrets and variables → Actions → New repository secret)
 
 | Secret | Value |
 |--------|-------|
-| `TG_INIT_DATA` | The `x-telegram-init-data` value captured from DevTools (required) |
-| `TG_CLAIM_URL` | Optional — defaults to `https://app.piratezparty.com/api/daily` |
-| `TG_CLAIM_BODY` | Optional — defaults to `{}` |
+| `TG_API_ID` | Your Telegram API ID |
+| `TG_API_HASH` | Your Telegram API Hash |
+| `TG_SESSION_STRING` | The `AUTH_SESSION_STRING` from step 1 |
+| `TG_PHONE` | Your phone number (fallback only) |
+| `TG_BOT_USERNAME` | The bot username, without `@` (e.g. `pzpsentrybot`) |
 
-#### One-time setup
+### One-time setup
 
-1. Push this repo to GitHub (credentials are gitignored — never commit them)
-2. Add `TG_INIT_DATA` secret with your captured initData value
-3. The workflow will now claim XP daily
-4. Check the Actions tab or the `xp-claim-logs` artifact for results
+1. Push this repo to GitHub
+2. Add the 5 secrets above
+3. The workflow will claim XP daily — check the Actions tab or the
+   `xp-claim-logs` artifact for results
 
-#### initData expiry
+### No initData refresh needed
 
-The initData hash expires over time. If claims start failing (check the Actions
-logs), re-capture a fresh initData from DevTools and update the `TG_INIT_DATA`
-secret.
+Unlike the old HTTP-replay approach, `requestWebView` gets **fresh initData from
+Telegram's servers every run**. There's nothing to expire and nothing to
+manually update.
 
-## Method A — Telethon (MTProto) — NOT needed for your setup
+## Files
 
-Included for reference. It clicks inline keyboard buttons in the bot's chat using
-your Telegram account, but cannot click inside Web Apps. Your "Claim" button is
-inside the PZP Sentry mini app, so Method B is used instead.
-
-Files:
-- `reverse-engineer.ps1` — Method B: replays the mini app's HTTP claim request
-- `claim-xp-telethon.py` — Method A: Telethon button-clicker (not used for your mini app)
-- `claim-xp.ps1` — PowerShell runner for Method A
-- `.github/workflows/daily-claim.yml` — GitHub Actions daily schedule
-- `config.example.json` — credential template (gitignored)
+| File | Purpose |
+|------|---------|
+| `claim-xp-requestwebview.py` | Main script — fully automated via requestWebView |
+| `claim-xp-telethon.py` | Method A — inline button clicker (reference, not used for Web Apps) |
+| `claim-xp.ps1` | PowerShell runner for Method A |
+| `reverse-engineer.ps1` | Method B — manual HTTP replay (reference) |
+| `config.example.json` | Credential template |
+| `.github/workflows/daily-claim.yml` | GitHub Actions daily schedule |
+| `README.md` | These instructions |
 
 ## Safety notes
 
-* This automates YOUR OWN account in YOUR OWN group. Do not use it to mass-target
-  or spam other groups — that may get your Telegram account limited.
-* `initData` is a bearer-like credential: never log it or commit it to git.
-  `config.json` and `*.session` are gitignored.
+* This automates YOUR OWN account in YOUR OWN group. Do not mass-target or spam.
+* The session string is a bearer-like credential — never log it or commit it.
+  `config.json`, `*.session`, and session strings are gitignored.

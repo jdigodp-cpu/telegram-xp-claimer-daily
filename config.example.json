@@ -2,11 +2,10 @@
   "API_ID": 123456,
   "API_HASH": "0123456789abcdef0123456789abcdef",
   "PHONE": "+15551234567",
-  "BOT_USERNAME": "my_xp_bot",
+  "BOT_USERNAME": "pzpsentrybot",
   "SESSION_NAME": "xp_claimer_session",
   "SESSION_STRING": null,
-  "BUTTON_TEXT": "Claim XP",
-  "BUTTON_INDEX": null,
-  "MESSAGE_LIMIT": 100,
+  "WEB_APP_URL": "https://app.piratezparty.com/",
+  "CLAIM_URL": "https://app.piratezparty.com/api/daily",
   "DRY_RUN": false
 }

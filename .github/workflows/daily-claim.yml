@@ -15,13 +15,24 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Claim XP (Method B — mini app HTTP replay)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -q telethon aiohttp
+
+      - name: Claim XP (Method D — requestWebView, fully automated)
         env:
-          TG_INIT_DATA: ${{ secrets.TG_INIT_DATA }}
-          TG_CLAIM_URL: ${{ secrets.TG_CLAIM_URL }}
-          TG_CLAIM_BODY: ${{ secrets.TG_CLAIM_BODY }}
-          TG_DRY_RUN: "0"
-        run: pwsh -NoProfile -File reverse-engineer.ps1
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_SESSION_STRING: ${{ secrets.TG_SESSION_STRING }}
+          TG_PHONE: ${{ secrets.TG_PHONE }}
+          TG_BOT_USERNAME: ${{ secrets.TG_BOT_USERNAME }}
+          TG_WEB_APP_URL: "https://app.piratezparty.com/"
+          TG_CLAIM_URL: "https://app.piratezparty.com/api/daily"
+        run: python claim-xp-requestwebview.py config.json
 
       - name: Upload logs (always, even on failure)
         if: always()
