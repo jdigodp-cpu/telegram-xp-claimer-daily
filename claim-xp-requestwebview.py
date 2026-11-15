@@ -229,6 +229,8 @@ async def main() -> int:
         return 2
 
     session_string = cfg.get("SESSION_STRING")
+    if session_string:
+        session_string = session_string.strip()
     session_name = cfg.get("SESSION_NAME")
     client = TelegramClient(
         StringSession(session_string) if session_string else session_name,
