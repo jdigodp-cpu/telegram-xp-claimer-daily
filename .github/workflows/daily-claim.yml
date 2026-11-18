@@ -3,7 +3,7 @@ name: Daily XP Claim
 on:
   schedule:
     # Runs every day at 09:00 UTC. Change the cron to your preferred time.
-    - cron: "0 9 * * *"
+    - cron: "0 6 * * *"
   workflow_dispatch:   # lets you run it manually from the Actions tab
 
 permissions: {}
