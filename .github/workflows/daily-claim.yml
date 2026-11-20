@@ -2,9 +2,10 @@ name: Daily XP Claim
 
 on:
   schedule:
-    # Runs every 6 hours. Since the mini app has a 24-hour cooldown from last
-    # click, running more frequently ensures you never miss the claim window.
+    # Runs every 6 hours (UTC). Since the mini app has a 24-hour cooldown from
+    # last click, running more frequently ensures you never miss the claim window.
     # The script treats "already claimed" as success, not an error.
+    # Cron is in UTC — India time (IST) is UTC+5:30, shown in the logs below.
     - cron: "0 */6 * * *"
   workflow_dispatch:   # lets you run it manually from the Actions tab
 
@@ -16,6 +17,16 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
+      - name: Show current time in India (IST)
+        run: |
+          python3 -c "
+          from datetime import datetime, timezone, timedelta
+          ist = timezone(timedelta(hours=5, minutes=30))
+          now = datetime.now(ist)
+          print(f'Current IST time: {now.strftime(\"%Y-%m-%d %I:%M %p\")}')
+          print(f'UTC time: {datetime.now(timezone.utc).strftime(\"%Y-%m-%d %I:%M %p\")}')
+          "
 
       - name: Set up Python
         uses: actions/setup-python@v5
