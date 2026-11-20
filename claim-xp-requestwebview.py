@@ -205,8 +205,21 @@ async def claim_xp(init_data: str, cfg: dict, dry_run: bool) -> bool:
         async with session.post(cfg["CLAIM_URL"], headers=headers, json={}) as resp:
             text = await resp.text()
             if resp.status == 200:
-                log.info("XP claim successful (status 200): %s", text[:300])
-                return True
+                # Check if already claimed (server returns 200 but claimed: false)
+                try:
+                    data = json.loads(text)
+                    if data.get("claimed") is True:
+                        log.info("XP claim successful (status 200): %s", text[:300])
+                        return True
+                    elif data.get("claimed") is False:
+                        log.info("XP already claimed today (server returned claimed:false): %s", text[:300])
+                        return True  # Not an error — already claimed
+                    else:
+                        log.info("Server responded 200 but unclear claimed status: %s", text[:300])
+                        return True
+                except json.JSONDecodeError:
+                    log.info("Server responded 200 (non-JSON): %s", text[:300])
+                    return True
             else:
                 log.error("Claim failed with status %s: %s", resp.status, text[:300])
                 return False
