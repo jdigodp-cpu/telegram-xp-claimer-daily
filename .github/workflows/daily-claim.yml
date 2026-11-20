@@ -2,8 +2,10 @@ name: Daily XP Claim
 
 on:
   schedule:
-    # Runs every day at 09:00 UTC. Change the cron to your preferred time.
-    - cron: "0 6 * * *"
+    # Runs every 6 hours. Since the mini app has a 24-hour cooldown from last
+    # click, running more frequently ensures you never miss the claim window.
+    # The script treats "already claimed" as success, not an error.
+    - cron: "0 */6 * * *"
   workflow_dispatch:   # lets you run it manually from the Actions tab
 
 permissions: {}
