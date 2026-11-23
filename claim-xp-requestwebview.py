@@ -184,8 +184,9 @@ async def get_fresh_init_data(client: TelegramClient, cfg: dict) -> Optional[str
 
 
 async def claim_xp(init_data: str, cfg: dict, dry_run: bool) -> bool:
-    """POST initData to the daily claim endpoint."""
+    """POST initData to the daily claim endpoint with retry for Cloudflare blocks."""
     import aiohttp
+    import asyncio
 
     headers = {
         "Content-Type": "application/json",
@@ -194,6 +195,15 @@ async def claim_xp(init_data: str, cfg: dict, dry_run: bool) -> bool:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
         "Accept": "*/*",
         "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Sec-CH-UA": '"Not-A.Brand";v="99", "Chromium";v="157"',
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-GPC": "1",
+        "Priority": "u=1, i",
         "X-Telegram-Init-Data": init_data,
     }
 
@@ -201,28 +211,53 @@ async def claim_xp(init_data: str, cfg: dict, dry_run: bool) -> bool:
         log.info("[DRY-RUN] Would POST to %s with initData header", cfg["CLAIM_URL"])
         return True
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(cfg["CLAIM_URL"], headers=headers, json={}) as resp:
-            text = await resp.text()
-            if resp.status == 200:
-                # Check if already claimed (server returns 200 but claimed: false)
-                try:
-                    data = json.loads(text)
-                    if data.get("claimed") is True:
-                        log.info("XP claim successful (status 200): %s", text[:300])
-                        return True
-                    elif data.get("claimed") is False:
-                        log.info("XP already claimed today (server returned claimed:false): %s", text[:300])
-                        return True  # Not an error — already claimed
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(cfg["CLAIM_URL"], headers=headers, json={}) as resp:
+                    text = await resp.text()
+
+                    # Cloudflare 530 = origin DNS/block — retry with backoff
+                    if resp.status == 530:
+                        log.warning("Cloudflare block (530) on attempt %d/%d, retrying...",
+                                    attempt + 1, max_retries)
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(5 * (attempt + 1))
+                            continue
+                        log.error("Cloudflare block persisted after %d retries", max_retries)
+                        return False
+
+                    if resp.status == 200:
+                        # Check if already claimed (server returns 200 but claimed: false)
+                        try:
+                            data = json.loads(text)
+                            if data.get("claimed") is True:
+                                log.info("XP claim successful (status 200): %s", text[:300])
+                                return True
+                            elif data.get("claimed") is False:
+                                log.info("XP already claimed today (server returned claimed:false): %s",
+                                         text[:300])
+                                return True  # Not an error — already claimed
+                            else:
+                                log.info("Server responded 200 but unclear claimed status: %s",
+                                         text[:300])
+                                return True
+                        except json.JSONDecodeError:
+                            log.info("Server responded 200 (non-JSON): %s", text[:300])
+                            return True
                     else:
-                        log.info("Server responded 200 but unclear claimed status: %s", text[:300])
-                        return True
-                except json.JSONDecodeError:
-                    log.info("Server responded 200 (non-JSON): %s", text[:300])
-                    return True
-            else:
-                log.error("Claim failed with status %s: %s", resp.status, text[:300])
-                return False
+                        log.error("Claim failed with status %s: %s", resp.status, text[:300])
+                        return False
+        except aiohttp.ClientError as exc:
+            log.warning("Network error on attempt %d/%d: %s", attempt + 1, max_retries, exc)
+            if attempt < max_retries - 1:
+                await asyncio.sleep(5 * (attempt + 1))
+                continue
+            log.error("Network error persisted after %d retries", max_retries)
+            return False
+
+    return False
 
 
 async def main() -> int:
