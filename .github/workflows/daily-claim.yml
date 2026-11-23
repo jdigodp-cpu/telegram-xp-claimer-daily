@@ -34,7 +34,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -q telethon aiohttp
+        run: pip install -q telethon aiohttp backports.zstd
 
       - name: Claim XP (Method D — requestWebView, fully automated)
         env:
